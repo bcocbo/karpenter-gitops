@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: karpenter
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/bcocbo/karpenter-gitops.git  # Reemplaza con tu repo
+    targetRevision: HEAD
+    path: base/helm
+    helm:
+      releaseName: karpenter
+      chart: oci://public.ecr.aws/karpenter/karpenter
+      version: "1.6.2"
+      valuesFiles:
+      - values-base.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: karpenter
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
