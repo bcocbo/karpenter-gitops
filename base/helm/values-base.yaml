@@ -5,7 +5,7 @@ controller:
   containerName: controller
   image:
     repository: public.ecr.aws/karpenter/karpenter
-    tag: "1.6.2"  # Versión especificada en los YAMLs
+    tag: "1.7"  # Mantenida de tus YAMLs; considera 1.7.0 para EKS 1.30+
 nodeSelector:
   kubernetes.io/os: linux
   eks: karpenter
@@ -40,8 +40,8 @@ topologySpreadConstraints:
         app.kubernetes.io/name: karpenter
 serviceAccount:
   annotations:
-    eks.amazonaws.com/role-arn: "arn:aws:iam::851725646489:role/KarpenterNodeRole-poc-kafka2" 
+    eks.amazonaws.com/role-arn: "arn:aws:iam::851725646489:role/KarpenterNodeRole-poc-kafka2"  # Reemplaza ${AWS_ACCOUNT_ID}
 settings:
   clusterName: poc-kafka2
   interruptionQueue: poc-kafka2
-  defaultInstanceProfile: KarpenterNodeInstnceProfile-poc-kafka2
+  defaultInstanceProfile: KarpenterNodeInstanceProfile-poc-kafka2

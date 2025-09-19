@@ -17,14 +17,14 @@ spec:
     httpEndpoint: enabled
     httpProtocolIPv6: disabled
     httpPutResponseHopLimit: 2
-    httpTokens: optional
+    httpTokens: optional  # Considera 'required' para mayor seguridad
   role: KarpenterNodeRole-poc-kafka2
   securityGroupSelectorTerms:
-  - id: sg-0e1d856eae7d791ce
-  - id: sg-01c69055fd5bc91e5
+  - tags:
+      karpenter.sh/discovery: poc-kafka2
   subnetSelectorTerms:
-  - id: subnet-0d5e644a40aeb6e1d
-  - id: subnet-04f139d71de94997e
+  - tags:
+      karpenter.sh/discovery: poc-kafka2
   tags:
     Name: poc-kafka2-k8s-AmazonLinux2023-Node
     alpha.eksctl.io/cluster-name: poc-kafka2
