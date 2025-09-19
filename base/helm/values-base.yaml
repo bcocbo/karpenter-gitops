@@ -40,8 +40,8 @@ topologySpreadConstraints:
         app.kubernetes.io/name: karpenter
 serviceAccount:
   annotations:
-    eks.amazonaws.com/role-arn: "arn:aws:iam::${AWS_ACCOUNT_ID}:role/KarpenterControllerRole-eks-skillfullers-dev"  # Reemplaza con tu AWS Account ID
+    eks.amazonaws.com/role-arn: "arn:aws:iam::851725646489:role/KarpenterNodeRole-poc-kafka2" 
 settings:
-  clusterName: eks-skillfullers-dev
-  interruptionQueue: eks-skillfullers-dev
-  defaultInstanceProfile: KarpenterNodeInstanceProfile-eks-skillfullers-dev
+  clusterName: poc-kafka2
+  interruptionQueue: poc-kafka2
+  defaultInstanceProfile: KarpenterNodeInstnceProfile-poc-kafka2
