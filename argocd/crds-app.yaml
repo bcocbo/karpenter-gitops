@@ -4,7 +4,7 @@ metadata:
   name: karpenter-crds
   namespace: argocd
 spec:
-  project: karpenter
+  project: default
   source:
     repoURL: https://github.com/bcocbo/karpenter-gitops.git  # Reemplaza con tu repo
     targetRevision: HEAD
