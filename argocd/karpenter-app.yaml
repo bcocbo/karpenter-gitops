@@ -6,12 +6,12 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/bcocbo/karpenter-gitops.git  # Replace with your repo
+    repoURL: https://github.com/bcocbo/karpenter-gitops.git  # Replace with your Git repo URL
     targetRevision: HEAD
     path: base/helm
+    chart: oci://public.ecr.aws/karpenter/karpenter
     helm:
       releaseName: karpenter
-      chart: oci://public.ecr.aws/karpenter/karpenter
       version: "1.6.2"
       valueFiles:
       - values-base.yaml
