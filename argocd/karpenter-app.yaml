@@ -1,4 +1,3 @@
-# argocd/karpenter-app.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -9,27 +8,24 @@ metadata:
 spec:
   project: karpenter-project
   source:
-    repoURL: https://charts.karpenter.sh
-    chart: karpenter
-    targetRevision: "1.7.1"  # Última versión de Karpenter
+    repoURL: oci://public.ecr.aws/karpenter/karpenter
+    targetRevision: "1.0.8"  # Versión estable más reciente de Karpenter
+    chart: ""
     helm:
-      valueFiles:
-        - values.yaml
       values: |
-        # Configuración específica para AWS
+        # Configuración para Karpenter v1.0+
         settings:
+          clusterName: poc-kafka2
+          # Para AWS
           aws:
-            clusterName: poc-kafka2
             defaultInstanceProfile: KarpenterNodeInstanceProfile-poc-kafka2
             enablePodENI: false
             enableENILimitedPodDensity: true
-            isolatedVPC: false
-            nodeClassRef:
-              apiVersion: karpenter.k8s.aws/v1beta1
-              kind: EC2NodeClass
         
         # Configuración del controlador
         controller:
+          image:
+            repository: public.ecr.aws/karpenter/karpenter
           resources:
             requests:
               cpu: 1
@@ -38,7 +34,14 @@ spec:
               cpu: 1
               memory: 1Gi
         
-        # Configuración de tolerancias para el controlador
+        # Service Account con anotación para IRSA
+        serviceAccount:
+          create: true
+          name: karpenter
+          annotations:
+            eks.amazonaws.com/role-arn: "arn:aws:iam::851725646489:role/KarpenterNodeRole-poc-kafka2"
+        
+        # Tolerancias para el controlador
         tolerations:
           - key: CriticalAddonsOnly
             operator: Exists
@@ -52,17 +55,13 @@ spec:
                 - key: karpenter.sh/provisioner-name
                   operator: DoesNotExist
         
-        # Service Account
-        serviceAccount:
-          annotations:
-            eks.amazonaws.com/role-arn: "arn:aws:iam::851725646489:role/KarpenterNodeRole-poc-kafka2"
-        
         # Configuración de logs
         logLevel: info
         
-        # Webhook
+        # Configuración del webhook
         webhook:
           enabled: true
+          port: 8443
   
   destination:
     server: https://kubernetes.default.svc

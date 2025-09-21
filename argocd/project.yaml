@@ -8,8 +8,8 @@ metadata:
 spec:
   description: "Proyecto para gestionar Karpenter en el cluster poc-kafka2"
   sourceRepos:
-  - 'https://charts.karpenter.sh'
-  - 'https://github.com/bcocbo/karpenter-gitops'  # Repositorio de configuraciones
+  - 'oci://public.ecr.aws/karpenter/*'
+  - 'https://github.com/tu-usuario/karpenter-gitops'  # Repositorio de configuraciones
   destinations:
   - namespace: karpenter
     server: https://kubernetes.default.svc

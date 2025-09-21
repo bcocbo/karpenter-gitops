@@ -1,4 +1,3 @@
-# argocd/nodepool.yaml - Configuración de NodePool para Karpenter
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
