@@ -1,26 +1,85 @@
+# argocd/karpenter-app.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: karpenter
   namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
+  project: karpenter-project
   source:
-    repoURL: https://github.com/bcocbo/karpenter-gitops.git  # Replace with your Git repo URL
-    targetRevision: HEAD
-    path: base/helm
-    chart: oci://public.ecr.aws/karpenter/karpenter
+    repoURL: https://charts.karpenter.sh
+    chart: karpenter
+    targetRevision: "1.7.1"  # Última versión de Karpenter
     helm:
-      releaseName: karpenter
-      version: "1.6.2"
       valueFiles:
-      - values-base.yaml
+        - values.yaml
+      values: |
+        # Configuración específica para AWS
+        settings:
+          aws:
+            clusterName: poc-kafka2
+            defaultInstanceProfile: KarpenterNodeInstanceProfile-poc-kafka2
+            enablePodENI: false
+            enableENILimitedPodDensity: true
+            isolatedVPC: false
+            nodeClassRef:
+              apiVersion: karpenter.k8s.aws/v1beta1
+              kind: EC2NodeClass
+        
+        # Configuración del controlador
+        controller:
+          resources:
+            requests:
+              cpu: 1
+              memory: 1Gi
+            limits:
+              cpu: 1
+              memory: 1Gi
+        
+        # Configuración de tolerancias para el controlador
+        tolerations:
+          - key: CriticalAddonsOnly
+            operator: Exists
+        
+        # Configuración de afinidad
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: karpenter.sh/provisioner-name
+                  operator: DoesNotExist
+        
+        # Service Account
+        serviceAccount:
+          annotations:
+            eks.amazonaws.com/role-arn: "arn:aws:iam::851725646489:role/KarpenterNodeRole-poc-kafka2"
+        
+        # Configuración de logs
+        logLevel: info
+        
+        # Webhook
+        webhook:
+          enabled: true
+  
   destination:
     server: https://kubernetes.default.svc
     namespace: karpenter
+  
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-    - CreateNamespace=true
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  
+  revisionHistoryLimit: 5
