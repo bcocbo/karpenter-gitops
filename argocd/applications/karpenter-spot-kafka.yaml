@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: karpenter-spot-kafka
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/bcocbo/karpenter-gitops.git
+    targetRevision: HEAD
+    path: karpenter/nodepools/spot-kafka
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: karpenter
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

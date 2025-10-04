@@ -1,0 +1,16 @@
+apiVersion: karpenter.sh/v1beta1
+kind: EC2NodeClass
+metadata:
+  name: default2
+spec:
+  amiFamily: AL2
+  role: "KarpenterNodeRole-poc-kafka2"  # Ajusta al nombre real del rol IAM
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: poc-kafka2
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: poc-kafka2
+  tags:
+    karpenter.sh/discovery: poc-kafka2
+    Name: karpenter-node-poc-kafka2
