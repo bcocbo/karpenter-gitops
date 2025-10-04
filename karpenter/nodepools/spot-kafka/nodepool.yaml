@@ -1,0 +1,25 @@
+apiVersion: karpenter.sh/v1beta1
+kind: NodePool
+metadata:
+  name: spot-kafka
+spec:
+  template:
+    spec:
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot"]
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values: ["m5.large", "m5.xlarge", "m6i.large", "c5.large", "c5.xlarge"]
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+      nodeClassRef:
+        name: default
+  limits:
+    cpu: 1000
+    memory: 4000Gi
+  disruption:
+    consolidationPolicy: WhenUnderutilized
+    expireAfter: 720h
