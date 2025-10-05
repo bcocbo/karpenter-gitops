@@ -1,16 +1,14 @@
 apiVersion: karpenter.k8s.aws/v1
 kind: EC2NodeClass
 metadata:
-  name: default
+  name: defaultSpot
 spec:
-  amiFamily: AL2
-  role: "KarpenterNodeRole-poc-kafka2"
+  role: "KarpenterNodeRole-poc-kafka2" # replace with your cluster name
+  amiSelectorTerms:
+    - alias: "al2023@v20250920"
   subnetSelectorTerms:
     - tags:
-        karpenter.sh/discovery: poc-kafka2
+        karpenter.sh/discovery: "poc-kafka2" # replace with your cluster name
   securityGroupSelectorTerms:
     - tags:
-        karpenter.sh/discovery: poc-kafka2
-  tags:
-    karpenter.sh/discovery: poc-kafka2
-    Name: karpenter-node-poc-kafka2
+        karpenter.sh/discovery: "poc-kafka2" # replace with your cluster name
