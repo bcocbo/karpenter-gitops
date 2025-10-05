@@ -1,4 +1,4 @@
-apiVersion: karpenter.sh/v1beta1
+apiVersion: karpenter.k8s.aws/v1
 kind: NodePool
 metadata:
   name: spot-kafka
@@ -11,11 +11,12 @@ spec:
           values: ["spot"]
         - key: node.kubernetes.io/instance-type
           operator: In
-          values: ["m5.large", "m5.xlarge", "m6i.large", "c5.large", "c5.xlarge"]
+          values: ["m5.large", "m5.xlarge", "m6i.large", "c5.large", "c5.xlarge", "r5.large"]
         - key: kubernetes.io/arch
           operator: In
           values: ["amd64"]
       nodeClassRef:
+        apiVersion: karpenter.k8s.aws/v1
         name: default
   limits:
     cpu: 1000
