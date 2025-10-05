@@ -1,7 +1,7 @@
 apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
-  name: Spot
+  name: spot
 spec:
   template:
     spec:
@@ -24,7 +24,7 @@ spec:
       nodeClassRef:
         group: karpenter.k8s.aws
         kind: EC2NodeClass
-        name: defaultSpot
+        name: defaultspot
       expireAfter: 720h # 30 * 24h = 720h
   limits:
     cpu: 1000
