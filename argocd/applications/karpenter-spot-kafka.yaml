@@ -14,5 +14,5 @@ spec:
     namespace: karpenter
   syncPolicy:
     automated:
-      prune: true
+      prune: false
       selfHeal: true
