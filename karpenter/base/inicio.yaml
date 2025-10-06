@@ -1,7 +1,24 @@
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: ondemand
+spec:
+  role: "KarpenterNodeRole-poc-kafka2" # replace with your cluster name
+  amiSelectorTerms:
+    - alias: "al2023@v20250920"
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: poc-kafka2 # replace with your cluster name
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: poc-kafka2 # replace with your cluster name
+
+
+---
 apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
-  name: default
+  name: ondemand
 spec:
   template:
     spec:
@@ -22,28 +39,15 @@ spec:
           operator: Gt
           values: ["2"]
       nodeClassRef:
-        apiVersion: karpenter.k8s.aws/v1beta1
+        group: karpenter.k8s.aws
         kind: EC2NodeClass
-        name: default
+        name: ondemand
+      expireAfter: 720h # 30 * 24h = 720h
   limits:
     cpu: 1000
   disruption:
-    consolidationPolicy: WhenUnderutilized
-    expireAfter: 720h # 30 * 24h = 720h
----
-apiVersion: karpenter.k8s.aws/v1
-kind: EC2NodeClass
-metadata:
-  name: default
-spec:
-  amiFamily: AL2 # Amazon Linux 2
-  role: "KarpenterNodeRole-poc-kafka2" 
-  subnetSelectorTerms:
-    - tags:
-        karpenter.sh/discovery: poc-kafka2 
-  securityGroupSelectorTerms:
-    - tags:
-        karpenter.sh/discovery: poc-kafka2 
-  amiSelectorTerms:
-    - alias: "al2023@v20250920"
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 1m
+
+
 
