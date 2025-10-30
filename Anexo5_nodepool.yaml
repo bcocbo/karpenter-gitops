@@ -1,0 +1,49 @@
+# Anexo5_nodepool.yaml
+# Este archivo define un NodePool en Karpenter, que es un recurso personalizado para configurar cómo Karpenter gestiona nodos no programables y configura nodos. Según la documentación de Karpenter, los NodePools definen restricciones para determinar qué nodos se pueden aprovisionar y especifican atributos de estos nodos, incluyendo comportamientos de disrupción, límites y plantillas.
+
+apiVersion: karpenter.sh/v1  # Versión de la API de Karpenter para NodePool (versión v1 en la documentación actual).
+kind: NodePool  # Tipo de recurso: NodePool, utilizado por administradores de clúster para configurar el manejo de nodos.
+metadata:
+  name: spotvng  # Nombre del NodePool, debe ser único; este gestiona un conjunto específico de nodos.
+spec:
+  disruption:  # Sección para definir políticas de disrupción de nodos. Karpenter elimina nodos cuando no son necesarios, manejando conceptos como consolidación, expiración y deriva.
+    budgets:  # Presupuestos de disrupción: controlan cuántos nodos se pueden disruptir en un período.
+    - duration: 12h  # Duración del presupuesto: 12 horas.
+      nodes: "0"  # Número de nodos permitidos para disruptir: 0, lo que significa ninguna disrupción en este horario.
+      schedule: 0 11 * * mon-fri  # Horario Cron para aplicar este presupuesto: a las 11:00 de lunes a viernes.
+    - nodes: 10%  # Presupuesto general: permite disruptir hasta el 10% de los nodos.
+    consolidateAfter: 20m  # Tiempo después del cual se considera la consolidación: 20 minutos.
+    consolidationPolicy: WhenEmptyOrUnderutilized  # Política de consolidación: disruptir nodos vacíos o subutilizados para reducir costos, como se describe en la sección de Consolidación.
+  limits:  # Límites del NodePool: restringen el uso total de recursos.
+    cpu: 1000  # Límite de CPU total: 1000 núcleos, para evitar que este NodePool consuma más allá de este límite.
+  template:  # Plantilla para los nodos que se aprovisionan: define las especificaciones de los nodos.
+    spec:  # Especificaciones de la plantilla.
+      expireAfter: 720h  # Expiración de nodos: marca nodos para disrupción después de 720 horas (30 días), para reciclar nodos por razones de seguridad, como se menciona en Expiración.
+      nodeClassRef:  # Referencia a la clase de nodo específica del proveedor de nube (en este caso, AWS).
+        group: karpenter.k8s.aws  # Grupo de API para EC2NodeClass.
+        kind: EC2NodeClass  # Tipo: EC2NodeClass, que configura ajustes específicos de AWS.
+        name: spotvng  # Nombre de la EC2NodeClass referenciada (del otro archivo).
+      requirements:  # Requisitos: restricciones bien conocidas (well-known labels) para seleccionar tipos de nodos, como arquitectura, OS, tipo de capacidad, etc.
+      - key: kubernetes.io/arch  # Etiqueta Kubernetes para arquitectura.
+        operator: In  # Operador: debe estar en la lista de valores.
+        values:  # Valores permitidos.
+        - amd64  # Solo arquitectura AMD64.
+      - key: kubernetes.io/os  # Etiqueta para sistema operativo.
+        operator: In
+        values:
+        - linux  # Solo Linux.
+      - key: karpenter.sh/capacity-type  # Etiqueta específica de Karpenter para tipo de capacidad.
+        operator: In
+        values: ["spot", "on-demand"]  # Permite instancias Spot o On-Demand para optimizar costos.
+      - key: karpenter.k8s.aws/instance-size  # Etiqueta AWS para tamaño de instancia.
+        operator: In
+        values:
+        - 4xlarge  # Tamaños permitidos: 4xlarge, 8xlarge, 9xlarge.
+        - 8xlarge
+        - 9xlarge
+      - key: "karpenter.k8s.aws/instance-category"  # Etiqueta para categoría de instancia AWS.
+        operator: In
+        values: ["c", "m", "g", "r", "t", "i"]  # Categorías: Compute, Memory, GPU, etc.
+      - key: "karpenter.k8s.aws/instance-generation"  # Etiqueta para generación de instancia.
+        operator: Gt  # Operador: mayor que.
+        values: ["4"]  # Generaciones mayores a 4 (ej. 5ta generación o superior).
