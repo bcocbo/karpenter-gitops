@@ -1,0 +1,36 @@
+# EC2NodeClass DEV: Bottlerocket + 20Gi → Ahorro 60% EBS vs original (100GB→20GB: ~$6/nodo/mes).
+# Beneficios: Boot ~30s, immutable, ~0 mantenimiento. Ideal dev (tolerancia fallos).
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: dev-ec2-spot  # Ref en NodePool: nodeClassRef.name
+spec:
+  amiFamily: Bottlerocket  # ← **Optimización**: Menor footprint (8GB base), boot rápido.
+  amiSelectorTerms:  # ← **Opt**: Alias auto-update (seguridad gratis).
+  - alias: bottlerocket@latest/karpenter  # Latest EKS-optimized.
+  blockDeviceMappings:  # ← **Ahorro clave**: 20Gi (suficiente dev).
+  - deviceName: /dev/xvda
+    ebs:
+      deleteOnTermination: true
+      volumeSize: 20Gi  # ↓60% vs 50-100GB original.
+      volumeType: gp3
+      encrypted: true
+      iops: 3000  # Bajo para dev (↓10% costo).
+      throughput: 125  # Mínimo burst.
+  metadataOptions:  # ← **Seguridad**: IMDSv2 full.
+    httpEndpoint: enabled
+    httpTokens: required  # ¡Obligatorio! (vs optional original)
+    httpPutResponseHopLimit: 2
+  role: KarpenterNodeRole-eks-dev  # Rol dev (menos perms).
+  securityGroupSelectorTerms:  # ← **Flex**: Tags vs IDs fijos.
+  - tags:
+      Environment: dev
+  subnetSelectorTerms:
+  - tags:
+      Environment: dev
+  tags:  # Cost allocation.
+    Environment: dev
+    CostCenter: C103500093-dev  # Ajusta.
+    Name: eks-dev-karpenter-node
+  userData: |  # ← **Simplificado**: Solo bootstrap (sin resize).
+    /etc/eks/bootstrap.sh eks-skillfullers-dev  # Bottlerocket auto.

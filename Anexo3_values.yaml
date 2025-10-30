@@ -1,0 +1,37 @@
+# Anexo3_values.yaml
+# Este archivo parece ser un archivo de valores (values.yaml) para un chart de Helm utilizado en la instalación de Karpenter. Según la documentación de Karpenter en https://karpenter.sh/docs/concepts/, la instalación se realiza mediante un chart de Helm, y este archivo proporciona overrides o configuraciones personalizadas para el despliegue del controlador de Karpenter. Incluye anotaciones para pods, configuración de la imagen del controlador, afinidades y restricciones de topología para optimizar la programación y alta disponibilidad.
+
+podAnnotations:  # Anotaciones para los pods: se aplican a los pods del controlador de Karpenter para habilitar características como el scraping de métricas.
+  prometheus.io/port: "8080"  # Puerto para Prometheus: indica el puerto donde se exponen las métricas (8080 en este caso).
+  prometheus.io/scrape: "true"  # Habilitar scraping: permite que Prometheus recolecte métricas de este pod automáticamente.
+
+controller:  # Configuración del controlador: define detalles del contenedor principal de Karpenter, que es responsable de provisionar y gestionar nodos.
+  containerName: controller  # Nombre del contenedor: 'controller', el componente principal que maneja la lógica de aprovisionamiento.
+  image:  # Configuración de la imagen Docker: especifica el repositorio, tag y digest para asegurar una versión exacta y segura.
+    repository: 741333462696.dkr.ecr.us-east-1.amazonaws.com/ops0005001-skillfullers-pdn-ecr  # Repositorio: ubicación en Amazon ECR (Elastic Container Registry) para la imagen personalizada de Karpenter.
+    tag: karpenter-1.6.2  # Tag: versión específica de Karpenter (1.6.2), basada en la documentación que recomienda usar versiones estables.
+    digest: sha256:f212916fa2775a05bf1456100c46e1241e733517c2507f9afc0bc93f1b82dfc3  # Digest: hash SHA256 para pinning de imagen, asegura integridad y reproducibilidad, evitando cambios inesperados.
+
+affinity:  # Afinidades: reglas de Kubernetes para influir en la programación de pods, como se menciona en la sección de Scheduling de Karpenter. Ayuda a colocar pods en nodos adecuados y evitar concentraciones.
+  nodeAffinity:  # Afinidad de nodos: preferencias o requisitos para seleccionar nodos.
+    requiredDuringSchedulingIgnoredDuringExecution:  # Requerido durante programación: debe cumplirse para programar el pod.
+      nodeSelectorTerms:  # Términos de selección de nodos.
+        - matchExpressions:  # Expresiones de coincidencia.
+            - key: kubernetes.io/os  # Etiqueta Kubernetes bien conocida: sistema operativo del nodo.
+              operator: In  # Operador: debe estar en la lista.
+              values:  # Valores permitidos.
+                - linux  # Solo nodos con OS Linux, común para Karpenter ya que soporta Linux principalmente.
+  podAntiAffinity:  # Anti-afinidad de pods: evita programar múltiples pods en el mismo nodo para alta disponibilidad.
+    requiredDuringSchedulingIgnoredDuringExecution:  # Requerido: debe evitarse durante programación.
+      - topologyKey: "kubernetes.io/hostname"  # Clave de topología: hostname del nodo, para distribuir en hosts diferentes.
+        labelSelector:  # Selector de etiquetas: aplica a pods con estas etiquetas.
+          matchLabels:  # Coincidencias de etiquetas.
+            app.kubernetes.io/name: karpenter  # Etiqueta estándar para identificar pods de Karpenter.
+
+topologySpreadConstraints:  # Restricciones de dispersión de topología: como se describe en Scheduling, ayudan a distribuir pods de manera equilibrada across zonas o topologías para resiliencia y balanceo de carga.
+  - maxSkew: 1  # Desviación máxima: máximo 1 pod de diferencia entre dominios de topología.
+    topologyKey: topology.kubernetes.io/zone  # Clave de topología: zona de disponibilidad (AWS AZ), para distribuir across zonas.
+    whenUnsatisfiable: ScheduleAnyway  # Cuando no se satisface: programar de todos modos, en lugar de fallar.
+    labelSelector:  # Selector: aplica a pods con estas etiquetas.
+      matchLabels:  # Coincidencias.
+        app.kubernetes.io/name: karpenter  # Identifica los pods de Karpenter para aplicar la restricción.

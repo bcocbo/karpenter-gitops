@@ -1,0 +1,51 @@
+# NodePool para Ambiente de Desarrollo (Dev)
+# Optimizado para máximo ahorro de costos: prioriza instancias Spot (hasta 90% más baratas), consolidación agresiva de nodos subutilizados para reducir recursos innecesarios, expiración corta para reciclaje frecuente y budgets permisivos que permiten más disrupciones (tolerables en dev). Según best practices de Karpenter 2025, esto maximiza savings en entornos no críticos, diversificando tipos de instancias y usando generaciones eficientes. Referencia: docs Karpenter y artículos como "The Definitive Guide to Karpenter" y "How to Optimize Karpenter for Efficiency and Cost".
+
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: dev-spot-pool  # Nombre específico para dev, para aislamiento de workloads.
+spec:
+  disruption:  # Configuración de disrupción: agresiva para ahorro, permite consolidar nodos vacíos o subutilizados rápidamente.
+    budgets:  # Budgets: permiten hasta 50% de disrupción general y 0 durante horarios específicos si es necesario.
+    - nodes: 50%  # Alto porcentaje para disrupciones rápidas en dev.
+    - nodes: "0"  # Bloquea disrupciones en horarios críticos, pero en dev es opcional/minimal.
+      schedule: 0 9 * * mon-fri  # Ej. durante horas de trabajo, pero ajustable.
+      duration: 8h
+    consolidateAfter: 5m  # Espera solo 5 minutos antes de consolidar, para ahorro rápido.
+    consolidationPolicy: WhenEmptyOrUnderutilized  # Política agresiva: consolida nodos vacíos o subutilizados, maximizando bin-packing y replacements por instancias más baratas.
+  limits:  # Límites: restringe CPU total para evitar over-provisioning y costos excesivos.
+    cpu: 500  # Límite bajo para dev, ajustable según necesidades.
+  template:  # Plantilla de nodos: define restricciones para instancias económicas.
+    spec:
+      expireAfter: 168h  # Expiración después de 7 días: recicla nodos frecuentemente para seguridad y optimización (más corto que prod para dev).
+      terminationGracePeriod: 24h  # Grace period corto: acelera terminaciones para ahorro.
+      nodeClassRef:  # Referencia a EC2NodeClass: asume una configuración similar a la anterior, con AMI económica como AL2023.
+        apiVersion: karpenter.k8s.aws/v1
+        kind: EC2NodeClass
+        name: dev-ec2-class  # Nombre personalizado; configura con Spot-enabled.
+      requirements:  # Requisitos: prioriza Spot, arquitecturas eficientes (amd64 y arm64 para Graviton, que ahorra ~20%), categorías generales y generaciones nuevas (>5 para eficiencia).
+      - key: kubernetes.io/arch
+        operator: In
+        values:
+        - amd64
+        - arm64  # Agrega arm64 para instancias Graviton, más baratas y eficientes en energía.
+      - key: kubernetes.io/os
+        operator: In
+        values:
+        - linux
+      - key: karpenter.sh/capacity-type
+        operator: In
+        values: ["spot"]  # Solo Spot para máximo ahorro en dev (tolerancia a interrupciones).
+      - key: karpenter.k8s.aws/instance-size
+        operator: In
+        values:
+        - large
+        - xlarge
+        - 2xlarge  # Tamaños pequeños/medianos para granularidad y ahorro.
+      - key: karpenter.k8s.aws/instance-category
+        operator: In
+        values: ["c", "m", "r"]  # Categorías compute/memory para workloads generales, evitando GPUs caras.
+      - key: karpenter.k8s.aws/instance-generation
+        operator: Gt
+        values: ["5"]  # Generaciones >5: más eficientes y baratas (e.g., c6, m6).

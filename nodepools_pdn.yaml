@@ -1,0 +1,54 @@
+# NodePool para Ambiente de Producción (Prod)
+# Optimizado para máximo ahorro de costos con balance en reliability: usa Spot como prioridad pero fallback a On-Demand para evitar disrupciones críticas, consolidación de nodos subutilizados pero con budgets conservadores y consolidateAfter más largo. Según best practices 2025 (e.g., AWS EKS docs y "Optimizing Karpenter on EKS"), esto ahorra ~70-80% vs solo On-Demand, diversificando instancias y usando Graviton, mientras minimiza impactos en SLAs. Evita disrupciones en horarios de negocio.
+
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: prod-mixed-pool  # Nombre específico para prod, para aislamiento y estabilidad.
+spec:
+  disruption:  # Configuración de disrupción: balanceada, consolida pero con límites estrictos para evitar downtime.
+    budgets:  # Budgets: máximo 20% disrupción, bloquea en horarios de alto tráfico.
+    - nodes: 20%  # Porcentaje conservador para prod, evita disrupciones masivas.
+    - nodes: "0"  # Bloquea disrupciones durante horas pico (e.g., negocio).
+      schedule: 0 9 * * mon-fri
+      duration: 8h
+    - nodes: 10%  # Budget adicional para off-hours, permitiendo más ahorro nocturno.
+      schedule: 0 1 * * *
+      duration: 2h
+    consolidateAfter: 15m  # Espera 15 minutos: más largo que dev para estabilidad.
+    consolidationPolicy: WhenEmptyOrUnderutilized  # Política para ahorro: consolida subutilizados, pero con budgets para control.
+  limits:  # Límites: más altos para prod, pero aún restringidos para costos.
+    cpu: 2000  # Límite mayor para escalabilidad, pero previene overspending.
+  template:  # Plantilla de nodos: restricciones para instancias confiables y económicas.
+    spec:
+      expireAfter: 720h  # Expiración después de 30 días: más larga para estabilidad en prod.
+      terminationGracePeriod: 48h  # Grace period estándar: permite shutdown ordenado.
+      nodeClassRef:  # Referencia a EC2NodeClass: configura con encriptación y tags para billing.
+        apiVersion: karpenter.k8s.aws/v1
+        kind: EC2NodeClass
+        name: prod-ec2-class  # Nombre personalizado; incluye Spot con fallback.
+      requirements:  # Requisitos: prioriza Spot pero permite On-Demand, arquitecturas mixtas para diversidad y ahorro.
+      - key: kubernetes.io/arch
+        operator: In
+        values:
+        - amd64
+        - arm64  # Incluye Graviton para ~20% ahorro adicional en prod compatible.
+      - key: kubernetes.io/os
+        operator: In
+        values:
+        - linux
+      - key: karpenter.sh/capacity-type
+        operator: In
+        values: ["spot", "on-demand"]  # Spot primero (para ahorro), On-Demand fallback para reliability.
+      - key: karpenter.k8s.aws/instance-size
+        operator: In
+        values:
+        - 2xlarge
+        - 4xlarge
+        - 8xlarge  # Tamaños medianos/grandes para workloads estables.
+      - key: karpenter.k8s.aws/instance-category
+        operator: In
+        values: ["c", "m", "r"]  # Categorías optimizadas para prod, enfocadas en performance/cost.
+      - key: karpenter.k8s.aws/instance-generation
+        operator: Gt
+        values: ["5"]  # Generaciones >5: eficiencia energética y costos bajos.
