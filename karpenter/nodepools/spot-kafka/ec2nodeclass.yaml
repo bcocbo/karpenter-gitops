@@ -3,12 +3,12 @@ kind: EC2NodeClass
 metadata:
   name: defaultspot
 spec:
-  role: "KarpenterNodeRole-poc-kafka2" # replace with your cluster name
+  role: "KarpenterNodeRole-poc-kafka" # replace with your cluster name
   amiSelectorTerms:
     - alias: "al2023@v20250920"
   subnetSelectorTerms:
     - tags:
-        karpenter.sh/discovery: poc-kafka2 # replace with your cluster name
+        karpenter.sh/discovery: poc-kafka # replace with your cluster name
   securityGroupSelectorTerms:
     - tags:
-        karpenter.sh/discovery: poc-kafka2 # replace with your cluster name
+        karpenter.sh/discovery: poc-kafka # replace with your cluster name
