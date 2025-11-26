@@ -1,0 +1,84 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  annotations:
+    karpenter.sh/nodepool-hash: "7210412436326314290"
+    karpenter.sh/nodepool-hash-version: v3
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"karpenter.sh/v1","kind":"NodePool","metadata":{"annotations":{},"name":"ondemand"},"spec":{"disruption":{"consolidateAfter":"1m","consolidationPolicy":"WhenEmptyOrUnderutilized"},"limits":{"cpu":1000},"template":{"spec":{"expireAfter":"720h","nodeClassRef":{"group":"karpenter.k8s.aws","kind":"EC2NodeClass","name":"ondemand"},"requirements":[{"key":"kubernetes.io/arch","operator":"In","values":["amd64"]},{"key":"kubernetes.io/os","operator":"In","values":["linux"]},{"key":"karpenter.sh/capacity-type","operator":"In","values":["on-demand"]},{"key":"karpenter.k8s.aws/instance-category","operator":"In","values":["c","m","r"]},{"key":"karpenter.k8s.aws/instance-generation","operator":"Gt","values":["2"]}]}}}}
+  creationTimestamp: "2025-10-05T20:12:22Z"
+  generation: 2
+  name: ondemand
+  resourceVersion: "8547649"
+  uid: c8596562-bdcf-4033-b66b-7e484b7c00e3
+spec:
+  disruption:
+    budgets:
+    - nodes: 10%
+    consolidateAfter: 1m
+    consolidationPolicy: WhenEmptyOrUnderutilized
+  limits:
+    cpu: 1000
+  template:
+    spec:
+      expireAfter: 720h
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: ondemand
+      requirements:
+      - key: kubernetes.io/arch
+        operator: In
+        values:
+        - amd64
+      - key: kubernetes.io/os
+        operator: In
+        values:
+        - linux
+      - key: karpenter.sh/capacity-type
+        operator: In
+        values:
+        - on-demand
+      - key: karpenter.k8s.aws/instance-category
+        operator: In
+        values:
+        - m
+        - r
+      - key: karpenter.k8s.aws/instance-generation
+        operator: Gt
+        values:
+        - "2"
+status:
+  conditions:
+  - lastTransitionTime: "2025-10-05T20:12:22Z"
+    message: ""
+    observedGeneration: 2
+    reason: ValidationSucceeded
+    status: "True"
+    type: ValidationSucceeded
+  - lastTransitionTime: "2025-10-05T20:14:08Z"
+    message: ""
+    observedGeneration: 2
+    reason: NodeClassReady
+    status: "True"
+    type: NodeClassReady
+  - lastTransitionTime: "2025-10-06T14:02:50Z"
+    message: object is awaiting reconciliation
+    observedGeneration: 2
+    reason: AwaitingReconciliation
+    status: Unknown
+    type: NodeRegistrationHealthy
+  - lastTransitionTime: "2025-10-06T14:02:50Z"
+    message: ""
+    observedGeneration: 2
+    reason: Ready
+    status: "True"
+    type: Ready
+  nodeClassObservedGeneration: 1
+  resources:
+    cpu: "1"
+    ephemeral-storage: 20Gi
+    memory: 3788Mi
+    nodes: "1"
+    pods: "8"
+    vpc.amazonaws.com/pod-eni: "4"

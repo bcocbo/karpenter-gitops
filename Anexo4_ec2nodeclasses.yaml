@@ -1,0 +1,199 @@
+# Anexo4_ec2nodeclasses.yaml
+# Este archivo define una EC2NodeClass, que es un recurso para configurar ajustes específicos de AWS en Karpenter. Según la documentación, las EC2NodeClasses separan configuraciones Kubernetes de las específicas de AWS, permitiendo integración con otros proveedores. Se usa para AMI, roles, grupos de seguridad, subredes, etc.
+
+apiVersion: karpenter.k8s.aws/v1  # Versión de la API AWS específica de Karpenter (v1).
+kind: EC2NodeClass  # Tipo de recurso: EC2NodeClass, para configuraciones AWS.
+metadata:
+  name: spotvng  # Nombre: coincide con la referencia en el NodePool.
+spec:
+  amiFamily: AL2023  # Familia de AMI: Amazon Linux 2023, para nodos optimizados.
+  amiSelectorTerms:  # Términos para seleccionar AMI.
+  - id: ami-0cfd8c9a873d73514  # ID específico de AMI para usar.
+  blockDeviceMappings:  # Mapeos de dispositivos de bloque: configura volúmenes EBS.
+  - deviceName: /dev/xvda  # Nombre del dispositivo: raíz.
+    ebs:  # Configuración EBS.
+      deleteOnTermination: true  # Eliminar volumen al terminar la instancia.
+      volumeSize: 30Gi  # Tamaño inicial: 30 GiB.
+      volumeType: gp3  # Tipo: GP3 (general purpose SSD).
+      encrypted: true  # Encriptado: sí, para seguridad.
+  metadataOptions:  # Opciones de metadatos de instancia.
+    httpEndpoint: enabled  # Endpoint HTTP: habilitado.
+    httpProtocolIPv6: disabled  # Protocolo IPv6: deshabilitado.
+    httpPutResponseHopLimit: 2  # Límite de hops para PUT: 2.
+    httpTokens: optional  # Tokens HTTP: opcional (para IMDSv2).
+  role: KarpenterNodeRole-eks-skillfullers-dev  # Rol IAM: para que los nodos accedan a AWS (usando IRSA, como se menciona en Instalación).
+  securityGroupSelectorTerms:  # Términos para seleccionar grupos de seguridad.
+  - id: sg-0e1d856eae7d791dd  # IDs de grupos de seguridad específicos.
+  - id: sg-01c69055fd5bc91dd
+  subnetSelectorTerms:  # Términos para seleccionar subredes.
+  - id: subnet-0d5e644a40aeb6edd  # IDs de subredes específicas para alta disponibilidad.
+  - id: subnet-04f139d71de9499dd
+  tags:  # Etiquetas para las instancias: útiles para billing y organización.
+    Name: eks-skillfullers-dev-k8s-AmazonLinux2023-Node  # Nombre de la instancia.
+    alpha.eksctl.io/cluster-name: eks-skillfullers-dev  # Etiquetas EKS específicas.
+    app.solo99.com.co/application-code: ops0005001  # Etiquetas personalizadas para costos, entorno, etc.    
+    eksctl.io/v1alpha2/nodegroup-name: k8s-AmazonLinux2023
+  userData: |  # UserData: script de bootstrap que se ejecuta al lanzar la instancia. Incluye lógica para redimensionar EBS basado en tipo de instancia y OS.
+    #!/bin/bash 
+    set -e
+
+    # Función para obtener token IMDSv2: necesario para acceder a metadatos de instancia de forma segura.
+    get_imds_token() {
+        curl -X PUT "http://169.254.169.254/latest/api/token" \
+            -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" \
+            --max-time 10 --retry 3
+    }
+
+    # Función para obtener metadatos: usa el token para consultar datos como ID de instancia, región, etc.
+    get_metadata() {
+        local path=$1
+        local token=$2
+        curl -H "X-aws-ec2-metadata-token: $token" \
+            "http://169.254.169.254/latest/meta-data/$path" \
+            --max-time 10 --retry 3
+    }
+
+    # Detecta el OS: soporta Bottlerocket o AL2023.
+    detect_os() {
+        if [ -f /etc/bottlerocket-release ]; then
+            echo "bottlerocket"
+        elif [ -f /etc/os-release ] && grep -q "Amazon Linux" /etc/os-release; then
+            echo "al2023"
+        fi
+    }
+
+    # Determina tamaño objetivo de EBS basado en sufijo de instancia (ej. 4xlarge -> 50GB).
+    get_target_size_by_suffix() {
+        local instance_type=$1
+        local size_suffix=$(echo $instance_type | sed 's/.*\.//')
+
+        case $size_suffix in
+            4xlarge) echo 50 ;;
+            6xlarge) echo 80 ;;
+            8xlarge|9xlarge) echo 100 ;;
+            *) echo 100 ;;
+        esac
+    }
+
+    # Función principal: redimensiona EBS según tipo de instancia y OS, usando AWS CLI.
+    resize_ebs_for_instance() {
+        local os_type=$(detect_os)
+        local device
+
+        case $os_type in
+            bottlerocket)
+                device="/dev/xvdb"
+                ;;
+            al2023)
+                device="/dev/xvda"
+                ;;
+        esac
+
+        local token=$(get_imds_token)
+        if [ -z "$token" ]; then
+            echo "Failed to get IMDSv2 token"
+            return 1
+        fi
+
+        local instance_id=$(get_metadata "instance-id" "$token")
+        local region=$(get_metadata "placement/region" "$token")
+        local instance_type=$(get_metadata "instance-type" "$token")
+
+        if [ -z "$instance_id" ] || [ -z "$region" ] || [ -z "$instance_type" ]; then
+            echo "Failed to get required metadata"
+            return 1
+        fi
+
+        local target_size=$(get_target_size_by_suffix "$instance_type")
+        echo "OS: $os_type, Instance: $instance_type -> Target: ${target_size}GB"
+
+        local volume_id=$(aws ec2 describe-instances --instance-ids $instance_id \
+            --query 'Reservations[0].Instances[0].BlockDeviceMappings[?DeviceName==`'$device'`].Ebs.VolumeId' \
+            --output text --region $region)
+
+        if [ -z "$volume_id" ] || [ "$volume_id" = "None" ]; then
+            echo "Error: Could not find volume for device $device"
+            return 1
+        fi
+
+        local current_size=$(aws ec2 describe-volumes --volume-ids $volume_id \
+            --query 'Volumes[0].Size' --output text --region $region)
+
+        if [ "$current_size" -ge "$target_size" ]; then
+            echo "Volume already correct size (${current_size}GB)"
+            return 0
+        fi
+
+        echo "Resizing volume from ${current_size}GB to ${target_size}GB"
+        aws ec2 modify-volume --volume-id $volume_id --size $target_size --region $region
+        
+        # Espera a que la modificación complete, con timeout.
+        local timeout=300
+        local elapsed=0
+        local wait_time=2
+
+        while [ $elapsed -lt $timeout ]; do
+            local state=$(aws ec2 describe-volumes-modifications --volume-ids $volume_id \
+                --query 'VolumesModifications[0].ModificationState' --output text --region $region)
+
+            if [[ "$state" = "completed" || "$state" = "optimizing" ]]; then
+                echo "Volume modification completed"
+                break
+            elif [ "$state" = "failed" ]; then
+                echo "Volume modification failed"
+                return 1
+            fi
+
+            sleep $wait_time
+            elapsed=$((elapsed + wait_time))
+            wait_time=$((wait_time * 2))
+            [ $wait_time -gt 30 ] && wait_time=30
+        done
+
+        if [ $elapsed -ge $timeout ]; then
+            echo "Timeout waiting for volume modification"
+            return 1
+        fi
+
+        # Redimensiona el filesystem según OS (solo para AL2023).
+        if [ "$os_type" = "al2023" ]; then
+            growpart $device 1 || {
+                echo "Failed to extend partition"
+                return 1
+            }
+
+            local fs_type=$(lsblk -f ${device}1 | tail -1 | awk '{print $2}')
+            case $fs_type in
+                xfs)
+                    xfs_growfs / || {
+                        echo "Failed to resize XFS filesystem"
+                        return 1
+                    }
+                    ;;
+                ext4)
+                    resize2fs ${device}1 || {
+                        echo "Failed to resize ext4 filesystem"
+                        return 1
+                    }
+                ;;
+                *)
+                    echo "Unsupported filesystem: $fs_type"
+                    return 1
+                    ;;
+            esac
+        fi
+
+        echo "EBS resize completed successfully"
+        return 0
+    }
+
+    # Ejecuta la redimensión.
+    if ! resize_ebs_for_instance; then
+        echo "EBS resize failed"
+    fi
+
+    # Bootstrap específico del OS: inicia nodeadm para AL2023.
+    os_type=$(detect_os)
+    if [ "$os_type" = "al2023" ]; then
+        /usr/bin/nodeadm init
+    fi
