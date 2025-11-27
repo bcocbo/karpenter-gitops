@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/bcocbo/karpenter-gitops.git
     targetRevision: HEAD
-    path: karpenter/nodepools/spot-kafka
+    path: karpenter/base
   destination:
     server: https://kubernetes.default.svc
     namespace: karpenter
